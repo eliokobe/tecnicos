@@ -53,7 +53,8 @@ export function RepairForm({
     reparacion: '', // Single option
     material: '', // Material utilizado (antes cuadroElectrico)
     detalles: '', // Campo que siempre aparece
-    numeroSerie: '', // Número de serie cuando se sustituye el punto de recarga
+    numeroSerie: '', // Número de serie nuevo cuando se sustituye el punto de recarga
+    numeroSerieAntiguo: '', // Número de serie antiguo cuando se sustituye el punto de recarga
   });
   
   const [files, setFiles] = useState({
@@ -88,17 +89,17 @@ export function RepairForm({
       if (response.ok) {
         const data = await response.json();
         setIsEditMode(true);
-        const isRepaired = data.resultado === 'Reparado';
         setFormData(prev => ({
           ...prev,
           cliente: data.cliente || '',
           direccion: data.direccion || '',
-          telefono: data.Teléfono || data.telefono || '',
+          telefono: data.telefono || '',
           resultado: data.resultado || '',
-          reparacion: isRepaired ? data.reparacion || '' : '',
-          material: isRepaired ? (data.material || data.cuadroElectrico || '') : '',
-          detalles: data.detalles || data.problema || '', // Usar detalles o problema como fallback
+          reparacion: data.reparacion || '',
+          material: data.material || '',
+          detalles: data.detalles || '',
           numeroSerie: data.numeroSerie ? String(data.numeroSerie) : '',
+          numeroSerieAntiguo: data.numeroSerieAntiguo ? String(data.numeroSerieAntiguo) : '',
         }));
         setExistingAttachments({
           factura: Array.isArray(data.factura) ? data.factura : [],
@@ -126,18 +127,18 @@ export function RepairForm({
       if (response.ok) {
         const data = await response.json();
         setIsEditMode(true);
-        setRecordId(data.id); // Guardar el recordId para futuras actualizaciones
-        const isRepaired = data.resultado === 'Reparado';
+        setRecordId(data.id);
         setFormData(prev => ({
           ...prev,
           cliente: data.cliente || '',
           direccion: data.direccion || '',
-          telefono: data.Teléfono || data.telefono || '',
+          telefono: data.telefono || '',
           resultado: data.resultado || '',
-          reparacion: isRepaired ? data.reparacion || '' : '',
-          material: isRepaired ? (data.material || data.cuadroElectrico || '') : '',
-          detalles: data.detalles || data.problema || '', // Usar detalles o problema como fallback
+          reparacion: data.reparacion || '',
+          material: data.material || '',
+          detalles: data.detalles || '',
           numeroSerie: data.numeroSerie ? String(data.numeroSerie) : '',
+          numeroSerieAntiguo: data.numeroSerieAntiguo ? String(data.numeroSerieAntiguo) : '',
         }));
         setExistingAttachments({
           factura: Array.isArray(data.factura) ? data.factura : [],
@@ -178,7 +179,7 @@ export function RepairForm({
           if (!formData.reparacion.trim()) {
             newErrors.reparacion = 'Selecciona el tipo de reparación';
           }
-          if ((formData.reparacion === 'Reparar el cuadro eléctrico' || formData.reparacion === 'Sustituir el punto de recarga') && !formData.material.trim()) {
+          if ((formData.reparacion === 'Reparar el cuadro eléctrico' || formData.reparacion === 'Sustitución') && !formData.material.trim()) {
             newErrors.material = 'Selecciona el material utilizado';
           }
         }
@@ -186,23 +187,34 @@ export function RepairForm({
         if (!formData.detalles.trim()) {
           newErrors.detalles = 'Describe los detalles de la reparación';
         }
-        // Validar número de serie si se sustituye el punto de recarga
-        if (formData.reparacion === 'Sustituir el punto de recarga') {
+        // Validar números de serie si se sustituye el punto de recarga
+        if (formData.reparacion === 'Sustitución' && formData.material === 'Cargador') {
           const numeroSerieStr = String(formData.numeroSerie || '').trim();
           if (!numeroSerieStr) {
-            newErrors.numeroSerie = 'El número de serie es requerido al sustituir el punto de recarga';
+            newErrors.numeroSerie = 'El número de serie nuevo es requerido en sustitución';
+          }
+          const numeroSerieAntiguoStr = String(formData.numeroSerieAntiguo || '').trim();
+          if (!numeroSerieAntiguoStr) {
+            newErrors.numeroSerieAntiguo = 'El número de serie antiguo es requerido en sustitución';
           }
         }
         break;
         
       case 3:
-        if (files.foto.length === 0 && existingAttachments.foto.length === 0) {
-          newErrors.foto = 'Adjunta al menos una foto del punto de recarga después de la intervención';
-        }
-        // Si se seleccionó "Sustituir el punto de recarga", la foto de la etiqueta es obligatoria
-        if (formData.reparacion === 'Sustituir el punto de recarga') {
-          if (files.fotoEtiqueta.length === 0 && existingAttachments.fotoEtiqueta.length === 0) {
-            newErrors.fotoEtiqueta = 'La foto de la etiqueta del nuevo equipo es obligatoria';
+        // Si estamos en modo edición y ya hay un estado (Reparado o No reparado),
+        // permitir que el usuario solo adjunte la factura sin necesidad de fotos
+        const soloAdjuntandoFactura = isEditMode && formData.resultado && 
+                                      (files.factura.length > 0 || existingAttachments.factura.length > 0);
+        
+        if (!soloAdjuntandoFactura) {
+          if (files.foto.length === 0 && existingAttachments.foto.length === 0) {
+            newErrors.foto = 'Adjunta al menos una foto del punto de recarga después de la intervención';
+          }
+          // Si se seleccionó "Sustitución" y el material es "Cargador", la foto de la etiqueta es obligatoria
+          if (formData.reparacion === 'Sustitución' && formData.material === 'Cargador') {
+            if (files.fotoEtiqueta.length === 0 && existingAttachments.fotoEtiqueta.length === 0) {
+              newErrors.fotoEtiqueta = 'La foto de la etiqueta del nuevo equipo es obligatoria';
+            }
           }
         }
         break;
@@ -254,20 +266,29 @@ export function RepairForm({
       }
 
       const isRepaired = formData.resultado === 'Reparado';
+      
+      // Transformar los uploads al formato que Airtable espera: solo {url: "..."}
+      const transformUploads = (uploads: any[]) => uploads.map(u => ({ url: u.url }));
+      
       const repairData: Record<string, any> = {
         Estado: formData.resultado,
         Reparación: isRepaired ? formData.reparacion : undefined,
-        "Material": isRepaired && (formData.reparacion === 'Reparar el cuadro eléctrico' || formData.reparacion === 'Sustituir el punto de recarga')
+        "Material": isRepaired && (formData.reparacion === 'Reparar el cuadro eléctrico' || formData.reparacion === 'Sustitución')
           ? formData.material || undefined
           : undefined,
         Detalles: formData.detalles, // Siempre enviamos los detalles
-        "Número de serie": formData.numeroSerie ? parseFloat(formData.numeroSerie) : undefined,
+        "Número de serie nuevo": formData.numeroSerie ? parseFloat(formData.numeroSerie) : undefined,
+        "Número de serie antiguo": formData.numeroSerieAntiguo ? parseFloat(formData.numeroSerieAntiguo) : undefined,
         Cliente: formData.cliente,
         Dirección: formData.direccion,
-        Factura: facturaUploads.length > 0 ? facturaUploads : undefined,
-        Foto: fotoUploads.length > 0 ? fotoUploads : undefined,
-        "Foto de la etiqueta": fotoEtiquetaUploads.length > 0 ? fotoEtiquetaUploads : undefined,
+        Factura: facturaUploads.length > 0 ? transformUploads(facturaUploads) : undefined,
+        Foto: fotoUploads.length > 0 ? transformUploads(fotoUploads) : undefined,
       };
+
+      // Solo enviar foto de etiqueta si se subieron archivos Y si corresponde (Sustitución + Cargador)
+      if (fotoEtiquetaUploads.length > 0 && formData.reparacion === 'Sustitución' && formData.material === 'Cargador') {
+        repairData["Foto de la etiqueta"] = transformUploads(fotoEtiquetaUploads);
+      }
 
       // When editing, clear fields that don't apply based on result
       // Use null instead of empty string for select fields to avoid Airtable errors
@@ -278,7 +299,7 @@ export function RepairForm({
 
       if (isRepaired && isEditMode) {
         // Ya no necesitamos limpiar el campo problema, porque ahora usamos detalles siempre
-        if (formData.reparacion !== 'Reparar el cuadro eléctrico' && formData.reparacion !== 'Sustituir el punto de recarga') {
+        if (formData.reparacion !== 'Reparar el cuadro eléctrico' && formData.reparacion !== 'Sustitución') {
           repairData['Material'] = null;
         }
       }
@@ -309,6 +330,25 @@ export function RepairForm({
           onRepairError('Error al crear la reparación');
         }
         return;
+      }
+
+      const result = await response.json();
+      
+      // Actualizar estado del servicio según el resultado
+      if (result?.id) {
+        try {
+          await fetch('/api/repairs/finalize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              repairRecordId: result.id,
+              resultado: formData.resultado
+            }),
+          });
+        } catch (finalizeError) {
+          console.error('Error al actualizar servicio:', finalizeError);
+          // No mostramos error al usuario, continuamos con el flujo normal
+        }
       }
 
       onRepairComplete();
@@ -352,18 +392,19 @@ export function RepairForm({
     setFormData(prev => ({
       ...prev,
       reparacion,
-      // Auto-rellenar material con "Cargador" cuando se selecciona "Sustituir el punto de recarga"
-      material: reparacion === 'Sustituir el punto de recarga' 
+      // Auto-rellenar material con "Cargador" cuando se selecciona "Sustitución"
+      material: reparacion === 'Sustitución' 
         ? 'Cargador' 
         : (reparacion === 'Reparar el cuadro eléctrico' ? prev.material : ''),
-      // Si no es "Sustituir el punto de recarga", limpiar el número de serie
-      numeroSerie: reparacion === 'Sustituir el punto de recarga' ? prev.numeroSerie : ''
+      // Si no es "Sustitución", limpiar los números de serie
+      numeroSerie: reparacion === 'Sustitución' ? prev.numeroSerie : '',
+      numeroSerieAntiguo: reparacion === 'Sustitución' ? prev.numeroSerieAntiguo : ''
     }));
     
     if (errors.reparacion) {
       setErrors(prev => ({ ...prev, reparacion: '' }));
     }
-    if (errors.material && reparacion !== 'Reparar el cuadro eléctrico' && reparacion !== 'Sustituir el punto de recarga') {
+    if (errors.material && reparacion !== 'Reparar el cuadro eléctrico' && reparacion !== 'Sustitución') {
       setErrors(prev => ({ ...prev, material: '' }));
     }
   };
@@ -617,7 +658,7 @@ export function RepairForm({
                     </motion.div>
                   )}
 
-                  {formData.reparacion === 'Sustituir el punto de recarga' && (
+                  {formData.reparacion === 'Sustitución' && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
@@ -656,27 +697,53 @@ export function RepairForm({
                         )}
                       </div>
                       
-                      <div>
-                        <label htmlFor="numeroSerie" className="block text-sm font-medium text-gray-700 mb-2">
-                          Número de serie del nuevo punto de recarga *
-                        </label>
-                        <input
-                          type="number"
-                          id="numeroSerie"
-                          value={formData.numeroSerie}
-                          onChange={(e) => handleInputChange('numeroSerie', e.target.value)}
-                          className={cn(
-                            "w-full px-4 py-4 text-base rounded-xl border transition-all duration-200 focus:shadow-md focus:ring-2 touch-manipulation",
-                            errors.numeroSerie 
-                              ? "border-red-300 focus:ring-red-200 focus:border-red-400" 
-                              : "border-gray-300 focus:ring-green-200 focus:border-green-400"
-                          )}
-                          placeholder="Ingresa el número de serie..."
-                        />
-                        {errors.numeroSerie && (
-                          <p className="text-red-600 text-sm mt-1">{errors.numeroSerie}</p>
-                        )}
-                      </div>
+                      {formData.material === 'Cargador' && (
+                        <>
+                          <div>
+                            <label htmlFor="numeroSerieAntiguo" className="block text-sm font-medium text-gray-700 mb-2">
+                              Número de serie antiguo *
+                            </label>
+                            <input
+                              type="number"
+                              id="numeroSerieAntiguo"
+                              value={formData.numeroSerieAntiguo}
+                              onChange={(e) => handleInputChange('numeroSerieAntiguo', e.target.value)}
+                              className={cn(
+                                "w-full px-4 py-4 text-base rounded-xl border transition-all duration-200 focus:shadow-md focus:ring-2 touch-manipulation",
+                                errors.numeroSerieAntiguo 
+                                  ? "border-red-300 focus:ring-red-200 focus:border-red-400" 
+                                  : "border-gray-300 focus:ring-green-200 focus:border-green-400"
+                              )}
+                              placeholder="Ingresa el número de serie antiguo..."
+                            />
+                            {errors.numeroSerieAntiguo && (
+                              <p className="text-red-600 text-sm mt-1">{errors.numeroSerieAntiguo}</p>
+                            )}
+                          </div>
+                          
+                          <div>
+                            <label htmlFor="numeroSerie" className="block text-sm font-medium text-gray-700 mb-2">
+                              Número de serie nuevo *
+                            </label>
+                            <input
+                              type="number"
+                              id="numeroSerie"
+                              value={formData.numeroSerie}
+                              onChange={(e) => handleInputChange('numeroSerie', e.target.value)}
+                              className={cn(
+                                "w-full px-4 py-4 text-base rounded-xl border transition-all duration-200 focus:shadow-md focus:ring-2 touch-manipulation",
+                                errors.numeroSerie 
+                                  ? "border-red-300 focus:ring-red-200 focus:border-red-400" 
+                                  : "border-gray-300 focus:ring-green-200 focus:border-green-400"
+                              )}
+                              placeholder="Ingresa el número de serie nuevo..."
+                            />
+                            {errors.numeroSerie && (
+                              <p className="text-red-600 text-sm mt-1">{errors.numeroSerie}</p>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </motion.div>
                   )}
                 </motion.div>
@@ -720,6 +787,23 @@ export function RepairForm({
                 Documentación
               </h2>
               
+              {/* Mensaje informativo si está solo adjuntando factura */}
+              {isEditMode && formData.resultado && (formData.resultado === 'Reparado' || formData.resultado === 'No reparado') && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-900 mb-1">
+                        Adjuntar factura
+                      </p>
+                      <p className="text-sm text-blue-700">
+                        Puedes adjuntar solo la factura sin necesidad de volver a subir las fotos.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <FileUpload
                 label="Foto del punto de recarga después de la intervención"
                 required
@@ -735,8 +819,8 @@ export function RepairForm({
                 </p>
               )}
 
-              {/* Mostrar campo de foto de etiqueta solo si se seleccionó "Sustituir el punto de recarga" */}
-              {formData.reparacion === 'Sustituir el punto de recarga' && (
+              {/* Mostrar campo de foto de etiqueta solo si se seleccionó "Sustitución" y el material es "Cargador" */}
+              {formData.reparacion === 'Sustitución' && formData.material === 'Cargador' && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}

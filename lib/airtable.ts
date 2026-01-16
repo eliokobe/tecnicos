@@ -43,10 +43,21 @@ async function makeRequest(url: string, options: RequestInit = {}) {
       
       if (!response.ok) {
         let details = '';
+        let errorData: any = null;
         try {
           const text = await response.text();
+          console.error('❌ Airtable error response:', text);
+          errorData = JSON.parse(text);
           details = text.length < 500 ? ` - ${text}` : '';
-        } catch {}
+        } catch {
+          details = '';
+        }
+        
+        // Log the error details specifically
+        if (errorData?.error) {
+          console.error('❌ Airtable error details:', JSON.stringify(errorData.error, null, 2));
+        }
+        
         throw new Error(`Airtable API error: ${response.status} ${response.statusText}${details}`);
       }
       
@@ -148,6 +159,17 @@ export async function updateRecord(tableName: string, id: string, fields: Record
   }, {} as Record<string, any>);
   
   console.log('  cleaned fields keys:', Object.keys(cleanedFields));
+  
+  // Log attachments specifically
+  if (cleanedFields.Foto) {
+    console.log('  Foto structure:', JSON.stringify(cleanedFields.Foto).substring(0, 200));
+  }
+  if (cleanedFields.Factura) {
+    console.log('  Factura structure:', JSON.stringify(cleanedFields.Factura).substring(0, 200));
+  }
+  if (cleanedFields['Foto de la etiqueta']) {
+    console.log('  Foto de la etiqueta structure:', JSON.stringify(cleanedFields['Foto de la etiqueta']).substring(0, 200));
+  }
 
   const payload = { fields: cleanedFields };
   console.log('📤 Payload size:', JSON.stringify(payload).length, 'characters');
@@ -171,6 +193,12 @@ export async function updateRecord(tableName: string, id: string, fields: Record
     
     const data: any = await response.json();
     console.log('📥 Response data keys:', Object.keys(data));
+    
+    if (!response.ok) {
+      console.error('❌ Airtable returned error:', response.status);
+      console.error('❌ Error response:', JSON.stringify(data, null, 2));
+      throw new Error(`Airtable error ${response.status}: ${JSON.stringify(data)}`);
+    }
     
     if (!data.id) {
       console.error('❌ No ID in response data:', data);
@@ -236,10 +264,6 @@ export async function updateRepairRecord(recordId: string, data: any): Promise<{
 }
 
 // Specific functions for Formulario table
-export async function createEnvio(envioData: any): Promise<{ id: string }> {
-  return createRecord(AIRTABLE_TABLE_ENVIOS, envioData);
-}
-
 export async function findFormularioByExpediente(expediente: string): Promise<any[]> {
   return listRecords(AIRTABLE_TABLE_FORMULARIO!, {
     filterByFormula: `{Expediente} = '${expediente}'`,
@@ -634,5 +658,45 @@ export async function getCitasOcupadasByDate(fecha: Date): Promise<any[]> {
   } catch (error) {
     console.error('Error al obtener citas ocupadas por fecha:', error);
     throw new Error('Failed to get citas ocupadas by date');
+  }
+}
+
+// Función para crear un registro en la tabla Envíos
+export async function createEnvio(envioData: any): Promise<{ id: string }> {
+  if (!AIRTABLE_TABLE_ENVIOS) {
+    throw new Error('AIRTABLE_TABLE_ENVIOS is not configured');
+  }
+
+  // Filter out undefined values to avoid sending them to Airtable
+  const cleanedFields = Object.entries(envioData).reduce((acc, [key, value]) => {
+    if (value !== undefined) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {} as Record<string, any>);
+
+  const payload = { fields: cleanedFields };
+
+  try {
+    const response = await makeRequest(getBaseUrl(AIRTABLE_TABLE_ENVIOS), {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    if (!response) {
+      throw new Error('No response received from Airtable');
+    }
+    
+    const data: any = await response.json();
+    
+    if (!data.id) {
+      throw new Error('No ID returned from Airtable');
+    }
+    
+    console.log('✅ Envío creado con ID:', data.id);
+    return { id: data.id };
+  } catch (error) {
+    console.error('Error creating record in Envíos:', error);
+    throw new Error('Failed to create record in Envíos');
   }
 }

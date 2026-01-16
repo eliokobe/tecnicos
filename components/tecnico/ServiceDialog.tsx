@@ -276,6 +276,25 @@ export function ServiceDialog({ servicio, onClose, onLoadServicios, onShowSucces
                 </div>
               </>
             )}
+
+            {(servicio.fields.Estado?.toLowerCase() === 'reparado' || servicio.fields.Estado?.toLowerCase() === 'no reparado') && (
+              <>
+                {servicio.fields.Factura && Array.isArray(servicio.fields.Factura) && servicio.fields.Factura.length > 0 ? (
+                  <Alert className="border-green-200 bg-green-50 mb-3">
+                    <FileText className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-sm text-green-800">
+                      Ya hay una factura subida
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+                <button
+                  onClick={() => openParte(getReparacionId())}
+                  className="w-full bg-[#008606] hover:bg-[#008606]/90 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
+                >
+                  Adjuntar Factura
+                </button>
+              </>
+            )}
           </TabsContent>
 
           <TabsContent value="ubicacion" className="space-y-4 mt-4">

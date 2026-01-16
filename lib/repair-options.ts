@@ -3,7 +3,7 @@
 export const serviciosOptions = [
   'Reparar el cuadro eléctrico',
   'Resetear la placa electrónica',
-  'Sustituir el punto de recarga',
+  'Sustitución',
   'Revisar la instalación'
 ];
 

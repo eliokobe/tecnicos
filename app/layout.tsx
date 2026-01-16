@@ -5,8 +5,15 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Portal Técnicos - Ritest",
+  title: "Portal de técnicos | Ritest",
   description: "Portal para técnicos de Ritest",
+  icons: {
+    icon: [
+      { url: '/favicon.png', sizes: 'any' },
+      { url: '/favicon.png', type: 'image/png' },
+    ],
+    apple: '/favicon.png',
+  },
 }
 
 export default function RootLayout({

@@ -92,14 +92,15 @@ export async function GET(request: NextRequest) {
       cliente: fields['Nombre del Cliente'] || fields['Cliente'] || fields['cliente'] || '',
       direccion: fields['Dirección'] || fields['direccion'] || '',
       telefono: fields['Teléfono'] || fields['telefono'] || '',
-      resultado: fields['Resultado'] || fields['resultado'] || '',
+      resultado: fields['Resultado'] || fields['resultado'] || fields['Estado'] || '',
       reparacion: fields['Reparación'] || fields['reparacion'] || '',
       material: fields['Material'] || fields['material'] || fields['Cuadro eléctrico'] || '',
       detalles: fields['Detalles'] || fields['detalles'] || fields['Problema'] || '',
-      numeroSerie: fields['Número de serie'] || fields['numeroSerie'] || '',
+      numeroSerie: fields['Número de serie nuevo'] || fields['Número de serie'] || fields['numeroSerie'] || '',
+      numeroSerieAntiguo: fields['Número de serie antiguo'] || fields['numeroSerieAntiguo'] || '',
       factura: fields['Factura'] || [],
       foto: fields['Foto'] || [],
-      fotoEtiqueta: fields['Foto de etiqueta'] || fields['fotoEtiqueta'] || [],
+      fotoEtiqueta: fields['Foto de etiqueta'] || fields['Foto de la etiqueta'] || fields['fotoEtiqueta'] || [],
       expediente: fields['Expediente'] || fields['expediente'] || '',
       fecha: fields['Fecha'] || fields['fecha'] || '',
       // Campos adicionales para CitaForm
@@ -152,6 +153,7 @@ export async function PATCH(request: NextRequest) {
     const urlRecord = searchParams.get('record');
     const urlExpediente = searchParams.get('expediente');
     
+    // Separar attachments del resto de los datos
     const { id, recordId, Foto, Factura, 'Foto de la etiqueta': FotoEtiqueta, ...updateData } = body;
     const targetId = urlId || urlRecord || urlExpediente || id || recordId;
 
@@ -186,7 +188,7 @@ export async function PATCH(request: NextRequest) {
           }
         }
       } else {
-        // Intentar actualizar en tabla de Reparaciones (sin imágenes primero)
+        // Intentar actualizar en tabla de Reparaciones
         try {
           result = await updateRepairRecord(finalRecordId, updateData);
         } catch (repairError: any) {
@@ -196,7 +198,7 @@ export async function PATCH(request: NextRequest) {
         }
       }
 
-      // Ahora subir las imágenes usando el endpoint especial de Airtable
+      // Ahora subir los attachments usando el Content API
       const uploadImageToAirtable = (await import('@/lib/airtable')).uploadImageToAirtable;
       
       if (Foto && Array.isArray(Foto) && Foto.length > 0) {
