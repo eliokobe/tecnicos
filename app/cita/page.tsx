@@ -97,7 +97,7 @@ export default function CitaPage() {
                     Sí, continuar con el parte
                   </button>
                   <button
-                    onClick={() => window.location.href = '/tecnico'}
+                    onClick={() => window.location.href = '/'}
                     className="w-full bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold py-3 px-6 rounded-xl transition-all duration-200"
                   >
                     No, volver al portal
@@ -109,7 +109,7 @@ export default function CitaPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5 }}
-                onClick={() => window.location.href = '/tecnico'}
+                onClick={() => window.location.href = '/'}
                 className="w-full bg-[#008606] hover:bg-[#008606]/90 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
               >
                 Volver al Portal

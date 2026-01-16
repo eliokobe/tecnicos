@@ -38,7 +38,7 @@ export default function PartePage() {
               {message}
             </p>
             <button
-              onClick={() => window.location.href = '/tecnico'}
+              onClick={() => window.location.href = '/'}
               className="w-full bg-[#008606] hover:bg-[#008606]/90 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               Volver al Portal

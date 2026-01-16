@@ -206,7 +206,7 @@ export default function Home() {
         
         {/* Grid de servicios */}
         <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {loadingServicios ? (
               <div className="col-span-full text-center py-16">
                 <Clock className="w-8 h-8 text-[#008606] animate-spin mx-auto mb-4" />
