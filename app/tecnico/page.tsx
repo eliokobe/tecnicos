@@ -9,14 +9,13 @@ import { ServiceCard } from '@/components/tecnico/ServiceCard'
 import { ServiceDialog } from '@/components/tecnico/ServiceDialog'
 import { NavigationBar } from '@/components/tecnico/NavigationBar'
 
-export default function Home() {
+export default function TecnicoPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [tecnicoData, setTecnicoData] = useState<any>(null)
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [loadingServicios, setLoadingServicios] = useState(false)
   const [selectedServicio, setSelectedServicio] = useState<Servicio | null>(null)
-  const [ocultarFinalizados, setOcultarFinalizados] = useState(false)
-  const [filtroEstado, setFiltroEstado] = useState<string | null>(null)
+  const [ocultarFinalizados, setOcultarFinalizados] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
@@ -100,14 +99,11 @@ export default function Home() {
     
     if (!matchesSearch) return false
     
-    // Si hay un filtro de estado específico seleccionado
-    if (filtroEstado) {
-      return estado === filtroEstado.toLowerCase()
-    }
-    
     if (ocultarFinalizados) {
-      // Mostrar solo: Reparado y No reparado
-      return estado === 'reparado' || estado === 'no reparado'
+      // Mostrar solo: Asignado, Aceptado, Citado (ocultar Reparado y No reparado)
+      return estado === 'asignado' || 
+             estado === 'aceptado' || 
+             estado === 'citado'
     }
     // Mostrar todos
     return true
@@ -148,59 +144,17 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Botones de filtro */}
-        <div className="mb-6 flex flex-wrap gap-2">
+        {/* Botón filtro */}
+        <div className="mb-6">
           <button
-            onClick={() => {
-              setOcultarFinalizados(!ocultarFinalizados)
-              setFiltroEstado(null)
-            }}
+            onClick={() => setOcultarFinalizados(!ocultarFinalizados)}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              ocultarFinalizados && !filtroEstado
+              ocultarFinalizados 
                 ? 'bg-gray-800 text-white' 
                 : 'bg-white text-gray-700 border border-gray-200'
             }`}
           >
-            Finalizados
-          </button>
-          <button
-            onClick={() => {
-              setFiltroEstado(filtroEstado === 'Asignado' ? null : 'Asignado')
-              setOcultarFinalizados(false)
-            }}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              filtroEstado === 'Asignado'
-                ? 'bg-gray-800 text-white' 
-                : 'bg-white text-gray-700 border border-gray-200'
-            }`}
-          >
-            Asignado
-          </button>
-          <button
-            onClick={() => {
-              setFiltroEstado(filtroEstado === 'Aceptado' ? null : 'Aceptado')
-              setOcultarFinalizados(false)
-            }}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              filtroEstado === 'Aceptado'
-                ? 'bg-gray-800 text-white' 
-                : 'bg-white text-gray-700 border border-gray-200'
-            }`}
-          >
-            Aceptado
-          </button>
-          <button
-            onClick={() => {
-              setFiltroEstado(filtroEstado === 'Citado' ? null : 'Citado')
-              setOcultarFinalizados(false)
-            }}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-              filtroEstado === 'Citado'
-                ? 'bg-gray-800 text-white' 
-                : 'bg-white text-gray-700 border border-gray-200'
-            }`}
-          >
-            Citado
+            Ocultar finalizados
           </button>
         </div>
         
