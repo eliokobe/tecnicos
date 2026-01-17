@@ -92,6 +92,8 @@ export default function Home() {
     const estado = servicio.fields.Estado?.toLowerCase()
     const cliente = Array.isArray(servicio.fields.Cliente) ? servicio.fields.Cliente[0] : servicio.fields.Cliente || ''
     const motivo = servicio.fields.Motivo || ''
+    const factura = servicio.fields.Factura
+    const fechaEstado = servicio.fields['Fecha estado']
     
     // Filtro de búsqueda
     const matchesSearch = searchTerm === '' || 
@@ -106,11 +108,23 @@ export default function Home() {
     }
     
     if (ocultarFinalizados) {
-      // Mostrar solo: Reparado y No reparado
-      return estado === 'reparado' || estado === 'no reparado'
+      // Mostrar solo: Reparado y No reparado que NO tengan factura
+      const tieneFactura = factura && Array.isArray(factura) && factura.length > 0
+      
+      // Verificar si la fecha estado es de hace más de 30 días
+      let esMayorA30Dias = false
+      if (fechaEstado) {
+        const fechaEstadoDate = new Date(fechaEstado)
+        const now = new Date()
+        const diffDays = (now.getTime() - fechaEstadoDate.getTime()) / (1000 * 60 * 60 * 24)
+        esMayorA30Dias = diffDays > 30
+      }
+      
+      return (estado === 'reparado' || estado === 'no reparado') && !tieneFactura && !esMayorA30Dias
     }
-    // Mostrar todos
-    return true
+    
+    // Sin filtro: solo mostrar Asignado, Citado y Aceptado
+    return estado === 'asignado' || estado === 'citado' || estado === 'aceptado'
   }
 
   if (!isAuthenticated) {

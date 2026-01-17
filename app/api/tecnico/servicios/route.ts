@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     console.log('Filtro de búsqueda:', filterFormula)
 
     // Incluir campos expandidos para obtener la población del cliente, factura y datos de Servicios
-    const fieldsParam = encodeURIComponent('fields[]=Cliente&fields[]=Población del cliente&fields[]=Estado&fields[]=Tipo de Servicio&fields[]=Dirección&fields[]=Teléfono&fields[]=Email&fields[]=Fecha de Servicio&fields[]=Descripción&fields[]=Notas Técnico&fields[]=Enlace Cita&fields[]=Cita técnico&fields[]=ID Cliente&fields[]=Reparaciones&fields[]=Teléfono técnico&fields[]=Factura&fields[]=Servicios&fields[]=Motivo&fields[]=Provincia&fields[]=Código postal')
+    const fieldsParam = encodeURIComponent('fields[]=Cliente&fields[]=Población del cliente&fields[]=Estado&fields[]=Tipo de Servicio&fields[]=Dirección&fields[]=Teléfono&fields[]=Email&fields[]=Fecha de Servicio&fields[]=Descripción&fields[]=Notas Técnico&fields[]=Enlace Cita&fields[]=Cita técnico&fields[]=ID Cliente&fields[]=Reparaciones&fields[]=Teléfono técnico&fields[]=Factura&fields[]=Servicios&fields[]=Motivo&fields[]=Provincia&fields[]=Código postal&fields[]=Comentarios técnico')
     const reparacionesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_REPARACIONES)}?filterByFormula=${encodeURIComponent(filterFormula)}`
     console.log('Buscando reparaciones en:', AIRTABLE_TABLE_REPARACIONES)
     
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { servicioId, estado, notas, generarEnlaceCita } = body
+    const { servicioId, estado, notas, comentarios, generarEnlaceCita } = body
     
     console.log('🔧 PATCH Request Body:', JSON.stringify(body, null, 2))
     console.log('📋 servicioId:', servicioId)
@@ -160,6 +160,10 @@ export async function PATCH(request: NextRequest) {
 
     if (notas !== undefined) {
       fieldsToUpdate['Notas Técnico'] = notas
+    }
+
+    if (comentarios !== undefined) {
+      fieldsToUpdate['Comentarios técnico'] = comentarios
     }
 
     // Si se solicita generar enlace de cita

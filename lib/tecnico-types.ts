@@ -14,10 +14,12 @@ export interface Servicio {
     'Estado'?: string
     'Motivo'?: string
     'Fecha estado'?: string
+    'Fecha creación'?: string
     'Cita'?: string
     'Fecha de Servicio'?: string
     'Descripción'?: string
     'Notas Técnico'?: string
+    'Comentarios técnico'?: string
     'Enlace Cita'?: string
     'Cita técnico'?: string
     'ID Cliente'?: string

@@ -6,7 +6,7 @@ export function getEstadoBadgeColor(servicio: Servicio): string {
   const fechaCita = servicio.fields['Cita']
   
   // Excepciones: No aplicar naranja en estos casos
-  if (estado === 'no reparado' || estado === 'finalizado') {
+  if (estado === 'reparado' || estado === 'no reparado' || estado === 'finalizado' || estado === 'aceptado' || estado === 'asignado') {
     return 'bg-[#008606]'
   }
   

@@ -4,7 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Calendar, FileText, Phone, Clock, User, MapPin, Navigation, ClipboardList } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { ArrowLeft, Calendar, FileText, Phone, Clock, User, MapPin, Navigation, ClipboardList, MessageSquare, Send } from 'lucide-react'
 import { Servicio } from '@/lib/tecnico-types'
 import { getEstadoBadgeColor, getPasosResolucion } from '@/lib/tecnico-utils'
 
@@ -18,6 +19,8 @@ interface ServiceDialogProps {
 export function ServiceDialog({ servicio, onClose, onLoadServicios, onShowSuccess }: ServiceDialogProps) {
   const [actionLoading, setActionLoading] = useState(false)
   const [modeloCargador, setModeloCargador] = useState<string>('')
+  const [nuevoComentario, setNuevoComentario] = useState<string>('')
+  const [enviandoComentario, setEnviandoComentario] = useState(false)
 
   if (!servicio) return null
 
@@ -77,6 +80,46 @@ export function ServiceDialog({ servicio, onClose, onLoadServicios, onShowSucces
     }
   }
 
+  const handleAgregarComentario = async () => {
+    if (!nuevoComentario.trim()) return
+
+    setEnviandoComentario(true)
+    try {
+      const comentariosActuales = servicio.fields['Comentarios técnico'] || ''
+      const now = new Date()
+      const timestamp = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+      const nuevoComentarioConFecha = `${timestamp} ${nuevoComentario}`
+      const comentariosActualizados = comentariosActuales 
+        ? `${comentariosActuales}\n${nuevoComentarioConFecha}`
+        : nuevoComentarioConFecha
+
+      const response = await fetch('/api/tecnico/servicios', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          servicioId: servicio.id,
+          comentarios: comentariosActualizados,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('Error del servidor:', errorData)
+        throw new Error(errorData.error || 'Error al agregar comentario')
+      }
+
+      setNuevoComentario('')
+      await onLoadServicios()
+    } catch (err: any) {
+      console.error('Error completo:', err)
+      alert('Error al agregar comentario: ' + err.message)
+    } finally {
+      setEnviandoComentario(false)
+    }
+  }
+
   const navigateToCita = (reparacionId: string) => {
     window.location.href = `/cita?id=${reparacionId}`
   }
@@ -116,14 +159,15 @@ export function ServiceDialog({ servicio, onClose, onLoadServicios, onShowSucces
         </DialogHeader>
 
         <Tabs defaultValue="accion" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="accion">Acción</TabsTrigger>
+            <TabsTrigger value="comentarios">
+              Comentarios
+            </TabsTrigger>
             <TabsTrigger value="pasos">
-              <ClipboardList className="w-4 h-4 mr-1" />
               Pasos
             </TabsTrigger>
             <TabsTrigger value="ubicacion">
-              <Navigation className="w-4 h-4 mr-1" />
               Ubicación
             </TabsTrigger>
           </TabsList>
@@ -156,10 +200,26 @@ export function ServiceDialog({ servicio, onClose, onLoadServicios, onShowSucces
                         </p>
                       </div>
                     </div>
+                    
+                    <div className="flex items-start gap-2">
+                      <Clock className="w-4 h-4 text-[#008606] mt-0.5" />
+                      <div>
+                        <p className="text-xs text-gray-600">Fecha creación</p>
+                        <p className="text-sm font-medium text-gray-900">
+                          {servicio.fields['Fecha creación']
+                            ? new Date(servicio.fields['Fecha creación'] as string).toLocaleString('es-ES', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            : 'No especificada'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                <div className="border-t border-gray-300 my-4"></div>
 
                 <div className="flex gap-3">
                   <button
@@ -216,10 +276,10 @@ export function ServiceDialog({ servicio, onClose, onLoadServicios, onShowSucces
                   <div className="flex items-start gap-2">
                     <Clock className="w-4 h-4 text-[#008606] mt-0.5" />
                     <div>
-                      <p className="text-xs text-gray-600">Último cambio</p>
+                      <p className="text-xs text-gray-600">Fecha creación</p>
                       <p className="text-sm font-medium text-gray-900">
-                        {servicio.fields['Fecha estado']
-                          ? new Date(servicio.fields['Fecha estado'] as string).toLocaleString('es-ES', {
+                        {servicio.fields['Fecha creación']
+                          ? new Date(servicio.fields['Fecha creación'] as string).toLocaleString('es-ES', {
                               day: '2-digit',
                               month: '2-digit',
                               year: 'numeric',
@@ -371,8 +431,7 @@ export function ServiceDialog({ servicio, onClose, onLoadServicios, onShowSucces
                 }}
                 className="w-full bg-[#008606] hover:bg-[#008606]/90 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
               >
-                <Navigation className="w-5 h-5" />
-                Abrir en Google Maps
+                Abrir en maps
               </button>
             )}
           </TabsContent>
@@ -446,6 +505,46 @@ export function ServiceDialog({ servicio, onClose, onLoadServicios, onShowSucces
                 <p className="text-sm text-gray-600">No hay motivo técnico especificado para este servicio</p>
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="comentarios" className="space-y-4 mt-4">
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h4 className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Comentarios
+              </h4>
+              
+              {/* Comentarios anteriores */}
+              <div className="mb-4 space-y-2 max-h-[400px] overflow-y-auto">
+                {servicio.fields['Comentarios técnico'] ? (
+                  servicio.fields['Comentarios técnico'].split('\n').map((comentario, index) => (
+                    <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
+                      <p className="text-sm text-gray-800">{comentario}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 italic">No hay comentarios aún</p>
+                )}
+              </div>
+              
+              {/* Nuevo comentario */}
+              <div className="space-y-2">
+                <Textarea
+                  placeholder="Escribe un comentario..."
+                  value={nuevoComentario}
+                  onChange={(e) => setNuevoComentario(e.target.value)}
+                  className="resize-none"
+                  rows={3}
+                />
+                <button
+                  onClick={handleAgregarComentario}
+                  disabled={enviandoComentario || !nuevoComentario.trim()}
+                  className="w-full bg-[#008606] hover:bg-[#008606]/90 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {enviandoComentario ? 'Enviando...' : 'Agregar comentario'}
+                </button>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>
