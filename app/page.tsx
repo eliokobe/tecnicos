@@ -23,20 +23,26 @@ export default function Home() {
   const [acceptedServicioId, setAcceptedServicioId] = useState<string | null>(null)
   const [successType, setSuccessType] = useState<'accepted' | 'rejected'>('accepted')
 
-  // Cargar sesión guardada al montar el componente
+  // Verificar sesión desde el servidor al montar el componente
   useEffect(() => {
-    const savedTecnico = localStorage.getItem('tecnicoData')
-    if (savedTecnico) {
+    const checkSession = async () => {
       try {
-        const data = JSON.parse(savedTecnico)
-        setTecnicoData(data)
-        setIsAuthenticated(true)
-        loadServicios(data.id, data.fields?.Teléfono)
+        const response = await fetch('/api/tecnico/auth/session')
+        if (response.ok) {
+          const { data } = await response.json()
+          setTecnicoData(data.tecnico)
+          setIsAuthenticated(true)
+          // Cargar servicios si tenemos la información necesaria
+          if (data.tecnico.telefono) {
+            loadServicios(data.tecnico.id, data.tecnico.telefono)
+          }
+        }
       } catch (err) {
-        console.error('Error al cargar sesión guardada:', err)
-        localStorage.removeItem('tecnicoData')
+        console.error('Error al verificar sesión:', err)
       }
     }
+    
+    checkSession()
   }, [])
 
   const handleLoginSuccess = async (data: any) => {
@@ -67,8 +73,12 @@ export default function Home() {
     }
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('tecnicoData')
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/tecnico/auth/logout', { method: 'POST' })
+    } catch (err) {
+      console.error('Error al cerrar sesión:', err)
+    }
     setIsAuthenticated(false)
     setTecnicoData(null)
     setServicios([])

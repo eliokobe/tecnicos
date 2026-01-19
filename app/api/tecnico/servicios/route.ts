@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { updateServicioRecord, getRepairById, getServicioById } from '@/lib/airtable'
+import { createClient } from '@/lib/supabase/server'
 
 const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN
 const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID
 const AIRTABLE_TABLE_TECNICOS = 'Técnicos'
 const AIRTABLE_TABLE_REPARACIONES = process.env.AIRTABLE_TABLE_REPARACIONES || 'Reparaciones'
+
+/**
+ * FASE 4: PROXY API SEGURO PARA AIRTABLE
+ * 
+ * Este endpoint actúa como proxy entre el cliente y Airtable:
+ * 1. Verifica la autenticación del técnico
+ * 2. Realiza la petición a Airtable desde el servidor (API Keys privadas)
+ * 3. Filtra la respuesta para enviar solo datos necesarios
+ * 4. Previene exposición de API Keys en el navegador
+ */
 
 // Helper function to fetch with retries
 async function fetchWithRetry(url: string, options: RequestInit, retries = 3): Promise<Response> {
@@ -34,10 +45,23 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3): P
 // GET - Obtener reparaciones asignadas a un técnico
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const tecnicoTelefono = searchParams.get('telefono')
+    // FASE 4: Verificar autenticación primero
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      console.log('❌ Usuario no autenticado')
+      return NextResponse.json(
+        { error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
+    // Obtener teléfono del usuario autenticado
+    const tecnicoTelefono = user.phone || user.user_metadata?.telefono
 
     console.log('=== OBTENIENDO REPARACIONES DEL TÉCNICO ===')
+    console.log('Usuario autenticado:', user.id)
     console.log('Teléfono técnico:', tecnicoTelefono)
 
     if (!tecnicoTelefono) {
@@ -101,8 +125,35 @@ export async function GET(request: NextRequest) {
     const data = await response.json()
     console.log(`✓ Reparaciones encontradas: ${data.records.length}`)
 
+    // FASE 4: Filtrar respuesta - Solo enviar campos necesarios
+    const serviciosFiltrados = data.records.map((record: any) => ({
+      id: record.id,
+      createdTime: record.createdTime,
+      fields: {
+        // Solo incluir campos que el técnico necesita ver
+        Cliente: record.fields.Cliente,
+        'Población del cliente': record.fields['Población del cliente'],
+        Estado: record.fields.Estado,
+        'Tipo de Servicio': record.fields['Tipo de Servicio'],
+        Dirección: record.fields.Dirección,
+        Teléfono: record.fields.Teléfono,
+        Email: record.fields.Email,
+        'Fecha de Servicio': record.fields['Fecha de Servicio'],
+        Descripción: record.fields.Descripción,
+        'Notas Técnico': record.fields['Notas Técnico'],
+        'Enlace Cita': record.fields['Enlace Cita'],
+        'Cita técnico': record.fields['Cita técnico'],
+        'ID Cliente': record.fields['ID Cliente'],
+        Motivo: record.fields.Motivo,
+        Provincia: record.fields.Provincia,
+        'Código postal': record.fields['Código postal'],
+        'Comentarios técnico': record.fields['Comentarios técnico'],
+        // NO incluir: Comisiones, Notas internas, Precios, etc.
+      }
+    }))
+
     // Log de las reparaciones encontradas
-    data.records.forEach((reparacion: any, index: number) => {
+    serviciosFiltrados.forEach((reparacion: any, index: number) => {
       const clienteName = Array.isArray(reparacion.fields['Cliente']) 
         ? reparacion.fields['Cliente'][0] 
         : reparacion.fields['Cliente'] || 'Sin nombre'
@@ -113,7 +164,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      servicios: data.records,
+      servicios: serviciosFiltrados,
     })
 
   } catch (error: any) {

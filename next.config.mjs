@@ -9,8 +9,13 @@ const nextConfig = {
   // Configuración para producción
   assetPrefix: process.env.NODE_ENV === 'production' ? 'https://tecnicos.ritest.es' : undefined,
   images: {
-    domains: ['tecnicos.ritest.es'],
-    unoptimized: false,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'tecnicos.ritest.es',
+      },
+    ],
+    unoptimized: process.env.NODE_ENV === 'development',
   },
   // Headers de seguridad
   async headers() {
@@ -37,6 +42,30 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin'
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block'
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(self)'
+          },
+          // FASE 4: Content Security Policy
+          // Bloquea scripts no autorizados y restringe dominios permitidos
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: https:",
+              "font-src 'self' data:",
+              "connect-src 'self' https://api.airtable.com https://*.supabase.co wss://*.supabase.co",
+              "frame-ancestors 'self'",
+              "base-uri 'self'",
+              "form-action 'self'"
+            ].join('; ')
           }
         ]
       }
