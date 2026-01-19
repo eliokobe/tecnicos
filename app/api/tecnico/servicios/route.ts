@@ -57,16 +57,16 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Obtener teléfono del usuario autenticado
-    const tecnicoTelefono = user.phone || user.user_metadata?.telefono
+    // Obtener email del usuario autenticado
+    const tecnicoEmail = user.email
 
     console.log('=== OBTENIENDO REPARACIONES DEL TÉCNICO ===')
     console.log('Usuario autenticado:', user.id)
-    console.log('Teléfono técnico:', tecnicoTelefono)
+    console.log('Email técnico:', tecnicoEmail)
 
-    if (!tecnicoTelefono) {
+    if (!tecnicoEmail) {
       return NextResponse.json(
-        { error: 'Teléfono de técnico no proporcionado' },
+        { error: 'Email de técnico no disponible' },
         { status: 400 }
       )
     }
@@ -79,31 +79,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Buscar reparaciones donde:
-    // 1. La columna "Técnicos" (linked record) tiene un registro con el teléfono del técnico
-    // 2. El Estado es uno de: "Asignado", "Aceptado", "Citado", "Reparado", "No reparado"
-    // 3. La Fecha creación no tiene más de 30 días de antigüedad
-    const today = new Date()
-    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000))
-    const thirtyDaysAgoISO = thirtyDaysAgo.toISOString().split('T')[0]
-    
-    const filterFormula = `AND(
-      FIND("${tecnicoTelefono}", ARRAYJOIN({Teléfono técnico})),
-      OR(
-        {Estado} = "Asignado",
-        {Estado} = "Aceptado",
-        {Estado} = "Citado",
-        {Estado} = "Reparado",
-        {Estado} = "No reparado"
-      ),
-      IS_AFTER({Fecha creación}, "${thirtyDaysAgoISO}")
-    )`
+    // Buscar reparaciones usando la vista "Portal" y filtrando por email
+    const filterFormula = `{Email técnico} = "${tecnicoEmail}"`
 
     console.log('Filtro de búsqueda:', filterFormula)
+    console.log('Vista: Portal')
 
-    // Incluir campos expandidos para obtener la población del cliente, factura y datos de Servicios
-    const fieldsParam = encodeURIComponent('fields[]=Cliente&fields[]=Población del cliente&fields[]=Estado&fields[]=Tipo de Servicio&fields[]=Dirección&fields[]=Teléfono&fields[]=Email&fields[]=Fecha de Servicio&fields[]=Descripción&fields[]=Notas Técnico&fields[]=Enlace Cita&fields[]=Cita técnico&fields[]=ID Cliente&fields[]=Reparaciones&fields[]=Teléfono técnico&fields[]=Factura&fields[]=Servicios&fields[]=Motivo&fields[]=Provincia&fields[]=Código postal&fields[]=Comentarios técnico')
-    const reparacionesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_REPARACIONES)}?filterByFormula=${encodeURIComponent(filterFormula)}`
+    const reparacionesUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_REPARACIONES)}?filterByFormula=${encodeURIComponent(filterFormula)}&view=Portal`
     console.log('Buscando reparaciones en:', AIRTABLE_TABLE_REPARACIONES)
     
     const response = await fetchWithRetry(reparacionesUrl, {

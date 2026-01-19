@@ -14,10 +14,11 @@ export async function GET() {
     const { data: { user }, error } = await supabase.auth.getUser()
 
     if (error || !user) {
-      return NextResponse.json(
-        { error: 'No hay sesión activa' },
-        { status: 401 }
-      )
+      // Devolvemos 200 para evitar errores en consola, pero indicando que no hay sesión
+      return NextResponse.json({
+        success: false,
+        error: 'No hay sesión activa'
+      }, { status: 200 })
     }
 
     // Extraer información del técnico

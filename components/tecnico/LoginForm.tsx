@@ -32,6 +32,12 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
 
   const handleSubmitCredentials = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!email.trim()) {
+      setError('Por favor, introduce tu email')
+      return
+    }
+
     setIsLoading(true)
     setError('')
 
@@ -199,7 +205,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                 Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
                 <input
                   id="email"
                   type="email"
@@ -215,8 +221,8 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
 
             <button
               type="submit"
-              disabled={isLoading || !email.trim()}
-              className="w-full bg-[#008606] text-white py-3 px-4 rounded-full font-medium hover:bg-[#008606]/90 focus:ring-2 focus:ring-[#008606] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              disabled={isLoading}
+              className={`w-full bg-[#008606] text-white py-3 px-4 rounded-full font-medium hover:bg-[#008606]/90 focus:ring-2 focus:ring-[#008606] focus:ring-offset-2 transition-colors relative z-10 ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               {isLoading ? 'Verificando...' : 'Continuar'}
             </button>

@@ -29,12 +29,13 @@ export default function Home() {
       try {
         const response = await fetch('/api/tecnico/auth/session')
         if (response.ok) {
-          const { data } = await response.json()
-          setTecnicoData(data.tecnico)
-          setIsAuthenticated(true)
-          // Cargar servicios si tenemos la información necesaria
-          if (data.tecnico.telefono) {
-            loadServicios(data.tecnico.id, data.tecnico.telefono)
+          const result = await response.json()
+          
+          if (result.success && result.data?.tecnico) {
+            setTecnicoData(result.data.tecnico)
+            setIsAuthenticated(true)
+            // Cargar servicios inmediatamente
+            loadServicios()
           }
         }
       } catch (err) {
@@ -48,17 +49,13 @@ export default function Home() {
   const handleLoginSuccess = async (data: any) => {
     setTecnicoData(data)
     setIsAuthenticated(true)
-    await loadServicios(data.id, data.fields?.Teléfono)
+    await loadServicios()
   }
 
-  const loadServicios = async (tecnicoId?: string, tecnicoTelefono?: string) => {
-    const id = tecnicoId || tecnicoData?.id
-    const telefono = tecnicoTelefono || tecnicoData?.fields?.Teléfono
-    if (!id || !telefono) return
-
+  const loadServicios = async () => {
     setLoadingServicios(true)
     try {
-      const response = await fetch(`/api/tecnico/servicios?telefono=${encodeURIComponent(telefono)}`)
+      const response = await fetch('/api/tecnico/servicios')
       const data = await response.json()
 
       if (!response.ok) {
