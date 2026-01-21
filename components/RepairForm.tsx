@@ -809,6 +809,7 @@ export function RepairForm({
                 required
                 error={errors.foto}
                 onFileSelect={(selected) => handleFileChange('foto', selected)}
+                maxFiles={5}
                 accept={{
                   'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
                 }}
