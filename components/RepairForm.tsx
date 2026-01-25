@@ -13,12 +13,13 @@ import {
   ChevronRight, 
   CheckCircle
 } from 'lucide-react';
-import { serviciosOptions, cuadroElectricoOptions } from '@/lib/repair-options';
+import { serviciosOptions, cuadroElectricoOptions, diferencialMonofasicoModelos, diferencialTrifasicoModelos, sobretensionesMonofasicoModelos, sobretensionesTrifasicoModelos, gdpModelos } from '@/lib/repair-options';
 
 const steps = [
   { id: 1, title: 'Datos Generales' },
   { id: 2, title: 'Reparación' },
-  { id: 3, title: 'Documentación' },
+  { id: 3, title: 'Confirmación' },
+  { id: 4, title: 'Documentación' },
 ];
 
 interface RepairFormProps {
@@ -40,7 +41,14 @@ export function RepairForm({
     factura: [] as any[],
     foto: [] as any[],
     fotoEtiqueta: [] as any[],
+    fotoEtiquetaAntigua: [] as any[],
   });
+  
+  const [tecnicoInfo, setTecnicoInfo] = useState<{
+    isFidelizado: boolean;
+  }>({ isFidelizado: false });
+
+  const [confirmacionCargador, setConfirmacionCargador] = useState(false);
   
   const [formData, setFormData] = useState({
     // Step 1: Datos Generales
@@ -52,6 +60,9 @@ export function RepairForm({
     resultado: '',
     reparacion: '', // Single option
     material: '', // Material utilizado (antes cuadroElectrico)
+    diferencialModelo: '',
+    sobretensionesModelo: '',
+    gdpModelo: '',
     detalles: '', // Campo que siempre aparece
     numeroSerie: '', // Número de serie nuevo cuando se sustituye el punto de recarga
     numeroSerieAntiguo: '', // Número de serie antiguo cuando se sustituye el punto de recarga
@@ -61,6 +72,7 @@ export function RepairForm({
     factura: [] as File[],
     foto: [] as File[],
     fotoEtiqueta: [] as File[],
+    fotoEtiquetaAntigua: [] as File[],
   });
   
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -97,6 +109,9 @@ export function RepairForm({
           resultado: data.resultado || '',
           reparacion: data.reparacion || '',
           material: data.material || '',
+          diferencialModelo: data.diferencialModelo || '',
+          sobretensionesModelo: data.sobretensionesModelo || '',
+          gdpModelo: data.gdpModelo || '',
           detalles: data.detalles || '',
           numeroSerie: data.numeroSerie ? String(data.numeroSerie) : '',
           numeroSerieAntiguo: data.numeroSerieAntiguo ? String(data.numeroSerieAntiguo) : '',
@@ -105,7 +120,12 @@ export function RepairForm({
           factura: Array.isArray(data.factura) ? data.factura : [],
           foto: Array.isArray(data.foto) ? data.foto : [],
           fotoEtiqueta: Array.isArray(data.fotoEtiqueta) ? data.fotoEtiqueta : [],
+          fotoEtiquetaAntigua: Array.isArray(data.fotoEtiquetaAntigua) ? data.fotoEtiquetaAntigua : [],
         });
+        
+        // Cargar información del técnico directamente desde el lookup field
+        console.log('🔍 Campo Fidelizado desde Airtable (loadRecordData):', data.isFidelizado, 'tipo:', typeof data.isFidelizado);
+        setTecnicoInfo({ isFidelizado: data.isFidelizado || false });
       } else if (response.status === 404) {
         onRepairError(`Registro ${record} no encontrado`);
       } else {
@@ -136,6 +156,9 @@ export function RepairForm({
           resultado: data.resultado || '',
           reparacion: data.reparacion || '',
           material: data.material || '',
+          diferencialModelo: data.diferencialModelo || '',
+          sobretensionesModelo: data.sobretensionesModelo || '',
+          gdpModelo: data.gdpModelo || '',
           detalles: data.detalles || '',
           numeroSerie: data.numeroSerie ? String(data.numeroSerie) : '',
           numeroSerieAntiguo: data.numeroSerieAntiguo ? String(data.numeroSerieAntiguo) : '',
@@ -144,7 +167,11 @@ export function RepairForm({
           factura: Array.isArray(data.factura) ? data.factura : [],
           foto: Array.isArray(data.foto) ? data.foto : [],
           fotoEtiqueta: Array.isArray(data.fotoEtiqueta) ? data.fotoEtiqueta : [],
+          fotoEtiquetaAntigua: Array.isArray(data.fotoEtiquetaAntigua) ? data.fotoEtiquetaAntigua : [],
         });
+        
+        // Cargar información del técnico directamente desde el lookup field
+        setTecnicoInfo({ isFidelizado: data.isFidelizado || false });
       } else if (response.status === 404) {
         onRepairError(`Expediente ${expedienteId} no encontrado`);
       } else {
@@ -156,6 +183,46 @@ export function RepairForm({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Función auxiliar para normalizar campos que pueden ser arrays
+  const normalizeField = (field: any): string => {
+    if (!field) return '';
+    if (Array.isArray(field)) {
+      return field.length > 0 ? String(field[0]) : '';
+    }
+    return String(field);
+  };
+
+  // Función auxiliar para obtener datos del servicio vinculado
+  const getServiceData = async (repairRecordId: string) => {
+    try {
+      const response = await fetch(`/api/repairs/service-data?repairId=${encodeURIComponent(repairRecordId)}`);
+      if (!response.ok) {
+        console.warn('No se pudo obtener datos del servicio vinculado');
+        return null;
+      }
+      
+      const serviceData = await response.json();
+      return serviceData;
+    } catch (error) {
+      console.error('Error obteniendo datos del servicio:', error);
+      return null;
+    }
+  };
+
+  // Función para determinar el número total de steps
+  const getTotalSteps = () => {
+    // Si material es Cargador, hay 4 pasos, sino 3
+    return formData.material === 'Cargador' ? 4 : 3;
+  };
+
+  const getCurrentStepTitle = () => {
+    if (formData.material !== 'Cargador' && currentStep >= 3) {
+      // Saltar el step 3 de confirmación
+      return steps[currentStep].title;
+    }
+    return steps[currentStep - 1]?.title || '';
   };
 
   const validateStep = (step: number): boolean => {
@@ -182,6 +249,15 @@ export function RepairForm({
           if ((formData.reparacion === 'Reparar el cuadro eléctrico' || formData.reparacion === 'Sustitución') && !formData.material.trim()) {
             newErrors.material = 'Selecciona el material utilizado';
           }
+          if ((formData.material === 'Diferencial monofásico' || formData.material === 'Diferencial trifásico') && !formData.diferencialModelo) {
+            newErrors.diferencialModelo = 'Selecciona el modelo de diferencial';
+          }
+          if ((formData.material === 'Sobretensiones monofásico' || formData.material === 'Sobretensiones trifásico') && !formData.sobretensionesModelo) {
+            newErrors.sobretensionesModelo = 'Selecciona el modelo de sobretensiones';
+          }
+          if (formData.material === 'Gestor de potencia' && !formData.gdpModelo) {
+            newErrors.gdpModelo = 'Selecciona el modelo de GDP';
+          }
         }
         // El campo detalles ahora es siempre requerido
         if (!formData.detalles.trim()) {
@@ -201,6 +277,15 @@ export function RepairForm({
         break;
         
       case 3:
+        // Solo validar si el material es Cargador
+        if (formData.material === 'Cargador') {
+          if (!confirmacionCargador) {
+            newErrors.confirmacionCargador = 'Debes confirmar que has empaquetado el cargador antiguo';
+          }
+        }
+        break;
+        
+      case 4:
         // Si estamos en modo edición y ya hay un estado (Reparado o No reparado),
         // permitir que el usuario solo adjunte la factura sin necesidad de fotos
         const soloAdjuntandoFactura = isEditMode && formData.resultado && 
@@ -216,6 +301,12 @@ export function RepairForm({
               newErrors.fotoEtiqueta = 'La foto de la etiqueta del nuevo equipo es obligatoria';
             }
           }
+          // Si el material es "Cargador", la foto de la etiqueta antigua es obligatoria
+          if (formData.material === 'Cargador') {
+            if (files.fotoEtiquetaAntigua.length === 0 && existingAttachments.fotoEtiquetaAntigua.length === 0) {
+              newErrors.fotoEtiquetaAntigua = 'La foto de la etiqueta del equipo antiguo es obligatoria';
+            }
+          }
         }
         break;
     }
@@ -226,12 +317,27 @@ export function RepairForm({
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 3));
+      const totalSteps = getTotalSteps();
+      let nextStepNumber = currentStep + 1;
+      
+      // Si NO es Cargador y estamos en Step 2, saltar al Step 4 (Documentación)
+      if (formData.material !== 'Cargador' && currentStep === 2) {
+        nextStepNumber = 4;
+      }
+      
+      setCurrentStep(Math.min(nextStepNumber, totalSteps + 1));
     }
   };
 
   const prevStep = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
+    let prevStepNumber = currentStep - 1;
+    
+    // Si NO es Cargador y estamos en Step 4, volver al Step 2 (saltar el Step 3)
+    if (formData.material !== 'Cargador' && currentStep === 4) {
+      prevStepNumber = 2;
+    }
+    
+    setCurrentStep(Math.max(prevStepNumber, 1));
   };
 
   const handleSubmit = async () => {
@@ -244,6 +350,7 @@ export function RepairForm({
       let facturaUploads: any[] = [];
       let fotoUploads: any[] = [];
       let fotoEtiquetaUploads: any[] = [];
+      let fotoEtiquetaAntiguaUploads: any[] = [];
       
       try {
         if (files.factura.length > 0) {
@@ -254,6 +361,9 @@ export function RepairForm({
         }
         if (files.fotoEtiqueta.length > 0) {
           fotoEtiquetaUploads = await uploadFiles(files.fotoEtiqueta);
+        }
+        if (files.fotoEtiquetaAntigua.length > 0) {
+          fotoEtiquetaAntiguaUploads = await uploadFiles(files.fotoEtiquetaAntigua);
         }
       } catch (uploadError: any) {
         // Show specific error message from upload
@@ -281,6 +391,9 @@ export function RepairForm({
         "Número de serie antiguo": formData.numeroSerieAntiguo ? parseFloat(formData.numeroSerieAntiguo) : undefined,
         Cliente: formData.cliente,
         Dirección: formData.direccion,
+        "Diferencial Modelo": formData.diferencialModelo || undefined,
+        "Sobretensiones Modelo": formData.sobretensionesModelo || undefined,
+        "GDP Modelo": formData.gdpModelo || undefined,
         Factura: facturaUploads.length > 0 ? transformUploads(facturaUploads) : undefined,
         Foto: fotoUploads.length > 0 ? transformUploads(fotoUploads) : undefined,
       };
@@ -290,17 +403,39 @@ export function RepairForm({
         repairData["Foto de la etiqueta"] = transformUploads(fotoEtiquetaUploads);
       }
 
+      // Enviar foto de etiqueta antigua si se subieron archivos Y el material es Cargador
+      if (fotoEtiquetaAntiguaUploads.length > 0 && formData.material === 'Cargador') {
+        repairData["Foto de la etiqueta antigua"] = transformUploads(fotoEtiquetaAntiguaUploads);
+      }
+
       // When editing, clear fields that don't apply based on result
       // Use null instead of empty string for select fields to avoid Airtable errors
       if (!isRepaired && isEditMode) {
         repairData['Reparación'] = null;
         repairData['Material'] = null;
+        repairData['Diferencial Modelo'] = null;
+        repairData['Sobretensiones Modelo'] = null;
+        repairData['GDP Modelo'] = null;
       }
 
       if (isRepaired && isEditMode) {
         // Ya no necesitamos limpiar el campo problema, porque ahora usamos detalles siempre
         if (formData.reparacion !== 'Reparar el cuadro eléctrico' && formData.reparacion !== 'Sustitución') {
           repairData['Material'] = null;
+          repairData['Diferencial Modelo'] = null;
+          repairData['Sobretensiones Modelo'] = null;
+          repairData['GDP Modelo'] = null;
+        } else {
+          // Si el material no es diferencial o sobretensiones, limpiar los modelos
+          if (formData.material !== 'Diferencial monofásico' && formData.material !== 'Diferencial trifásico') {
+            repairData['Diferencial Modelo'] = null;
+          }
+          if (formData.material !== 'Sobretensiones monofásico' && formData.material !== 'Sobretensiones trifásico') {
+            repairData['Sobretensiones Modelo'] = null;
+          }
+          if (formData.material !== 'Gestor de potencia') {
+            repairData['GDP Modelo'] = null;
+          }
         }
       }
 
@@ -349,6 +484,72 @@ export function RepairForm({
           console.error('Error al actualizar servicio:', finalizeError);
           // No mostramos error al usuario, continuamos con el flujo normal
         }
+
+        // Enviar webhook si es sustitución de cargador O si se han instalado protecciones
+        const isCargadorSustitucion = formData.reparacion === 'Sustitución' && formData.material === 'Cargador';
+        const isProteccionesInstaladas = ((formData.material === 'Diferencial monofásico' || formData.material === 'Diferencial trifásico') && formData.diferencialModelo) || 
+                                         ((formData.material === 'Sobretensiones monofásico' || formData.material === 'Sobretensiones trifásico') && formData.sobretensionesModelo) ||
+                                         (formData.material === 'Gestor de potencia' && formData.gdpModelo);
+
+        console.log('🔍 Verificando condiciones para webhook:', {
+          reparacion: formData.reparacion,
+          material: formData.material,
+          isCargadorSustitucion,
+          isProteccionesInstaladas
+        });
+        
+        if (isCargadorSustitucion || isProteccionesInstaladas) {
+          console.log('✅ Condiciones cumplidas - Iniciando proceso de webhook');
+          
+          try {
+            // Para cargador, validar que tenemos los datos necesarios
+            if (!isCargadorSustitucion || (formData.numeroSerie && formData.numeroSerieAntiguo)) {
+              console.log('📞 Obteniendo datos del servicio vinculado...');
+              const serviceData = await getServiceData(result.id);
+              console.log('📊 Datos del servicio recibidos:', serviceData);
+              
+              const webhookPayload = {
+                sn_instalado: isCargadorSustitucion ? String(formData.numeroSerie) : null,
+                sn_retirado: isCargadorSustitucion ? String(formData.numeroSerieAntiguo) : null,
+                modelo_componente: formData.diferencialModelo || formData.sobretensionesModelo || formData.gdpModelo || null,
+                tecnico: serviceData?.tecnico || '',
+                cliente: {
+                  nombre: formData.cliente,
+                  direccion: formData.direccion,
+                  ciudad: serviceData?.poblacion || '',
+                  cp: serviceData?.codigoPostal || '',
+                  provincia: serviceData?.provincia || '',
+                  telefono: formData.telefono || serviceData?.telefono || ''
+                },
+                id_reparacion: result.id
+              };
+
+              console.log('📤 Enviando datos al webhook:', JSON.stringify(webhookPayload, null, 2));
+
+              const webhookResponse = await fetch('/api/webhooks/charger-installed', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(webhookPayload),
+              });
+
+              if (webhookResponse.ok) {
+                const responseData = await webhookResponse.json();
+                console.log('✅ Webhook enviado correctamente');
+                console.log('📥 Respuesta del webhook:', responseData);
+              } else {
+                const errorData = await webhookResponse.json().catch(() => ({ error: 'Error desconocido' }));
+                console.warn('⚠️ El webhook respondió con error:', webhookResponse.status);
+                console.warn('⚠️ Detalles del error:', errorData);
+              }
+            } else {
+              console.warn('⚠️ Faltan números de serie para enviar al webhook de cargador');
+            }
+          } catch (webhookError) {
+            console.error('❌ Error al enviar webhook:', webhookError);
+          }
+        } else {
+          console.log('ℹ️ No se envía webhook - condiciones no cumplidas');
+        }
       }
 
       onRepairComplete();
@@ -376,6 +577,9 @@ export function RepairForm({
       // Ya no limpiamos los detalles, se mantienen siempre
       reparacion: resultado === 'No reparado' ? '' : prev.reparacion,
       material: resultado === 'No reparado' ? '' : prev.material,
+      diferencialModelo: resultado === 'No reparado' ? '' : prev.diferencialModelo,
+      sobretensionesModelo: resultado === 'No reparado' ? '' : prev.sobretensionesModelo,
+      gdpModelo: resultado === 'No reparado' ? '' : prev.gdpModelo,
       numeroSerie: resultado === 'No reparado' ? '' : prev.numeroSerie,
     }));
 
@@ -396,6 +600,9 @@ export function RepairForm({
       material: reparacion === 'Sustitución' 
         ? 'Cargador' 
         : (reparacion === 'Reparar el cuadro eléctrico' ? prev.material : ''),
+      diferencialModelo: reparacion === 'Sustitución' ? '' : prev.diferencialModelo,
+      sobretensionesModelo: reparacion === 'Sustitución' ? '' : prev.sobretensionesModelo,
+      gdpModelo: reparacion === 'Sustitución' ? '' : prev.gdpModelo,
       // Si no es "Sustitución", limpiar los números de serie
       numeroSerie: reparacion === 'Sustitución' ? prev.numeroSerie : '',
       numeroSerieAntiguo: reparacion === 'Sustitución' ? prev.numeroSerieAntiguo : ''
@@ -412,15 +619,27 @@ export function RepairForm({
   const handleMaterialChange = (opcion: string) => {
     setFormData(prev => ({
       ...prev,
-      material: opcion
+      material: opcion,
+      diferencialModelo: (opcion === 'Diferencial monofásico' || opcion === 'Diferencial trifásico') ? prev.diferencialModelo : '',
+      sobretensionesModelo: (opcion === 'Sobretensiones monofásico' || opcion === 'Sobretensiones trifásico') ? prev.sobretensionesModelo : '',
+      gdpModelo: opcion === 'Gestor de potencia' ? prev.gdpModelo : ''
     }));
 
     if (errors.material) {
       setErrors(prev => ({ ...prev, material: '' }));
     }
+    if (errors.diferencialModelo && opcion !== 'Diferencial monofásico' && opcion !== 'Diferencial trifásico') {
+      setErrors(prev => ({ ...prev, diferencialModelo: '' }));
+    }
+    if (errors.sobretensionesModelo && opcion !== 'Sobretensiones monofásico' && opcion !== 'Sobretensiones trifásico') {
+      setErrors(prev => ({ ...prev, sobretensionesModelo: '' }));
+    }
+    if (errors.gdpModelo && opcion !== 'Gestor de potencia') {
+      setErrors(prev => ({ ...prev, gdpModelo: '' }));
+    }
   };
 
-  const handleFileChange = (field: 'foto' | 'factura' | 'fotoEtiqueta', selectedFiles: File[]) => {
+  const handleFileChange = (field: 'foto' | 'factura' | 'fotoEtiqueta' | 'fotoEtiquetaAntigua', selectedFiles: File[]) => {
     setFiles(prev => ({ ...prev, [field]: selectedFiles }));
     setExistingAttachments(prev => ({
       ...prev,
@@ -655,6 +874,201 @@ export function RepairForm({
                       {errors.material && (
                         <p className="text-red-600 text-sm mt-2">{errors.material}</p>
                       )}
+
+                      {/* Selector condicional para Diferencial monofásico */}
+                      {formData.material === 'Diferencial monofásico' && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-4"
+                        >
+                          <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Modelo de Diferencial *
+                          </label>
+                          <div className="space-y-3">
+                            {diferencialMonofasicoModelos.map((modelo) => (
+                              <label
+                                key={modelo}
+                                className={cn(
+                                  "flex items-center p-4 sm:p-5 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md active:scale-95 touch-manipulation",
+                                  formData.diferencialModelo === modelo
+                                    ? "border-[#008606] bg-[#008606]/10"
+                                    : "border-gray-300 hover:border-gray-400"
+                                )}
+                              >
+                                <input
+                                  type="radio"
+                                  name="diferencialModelo"
+                                  value={modelo}
+                                  checked={formData.diferencialModelo === modelo}
+                                  onChange={() => handleInputChange('diferencialModelo', modelo)}
+                                  className="w-5 h-5 text-[#008606] border-gray-300 focus:ring-[#008606]"
+                                />
+                                <span className="ml-3 text-sm sm:text-base text-gray-700">{modelo}</span>
+                              </label>
+                            ))}
+                          </div>
+                          {errors.diferencialModelo && (
+                            <p className="text-red-600 text-sm mt-1">{errors.diferencialModelo}</p>
+                          )}
+                        </motion.div>
+                      )}
+
+                      {/* Selector condicional para Diferencial trifásico */}
+                      {formData.material === 'Diferencial trifásico' && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-4"
+                        >
+                          <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Modelo de Diferencial *
+                          </label>
+                          <div className="space-y-3">
+                            {diferencialTrifasicoModelos.map((modelo) => (
+                              <label
+                                key={modelo}
+                                className={cn(
+                                  "flex items-center p-4 sm:p-5 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md active:scale-95 touch-manipulation",
+                                  formData.diferencialModelo === modelo
+                                    ? "border-[#008606] bg-[#008606]/10"
+                                    : "border-gray-300 hover:border-gray-400"
+                                )}
+                              >
+                                <input
+                                  type="radio"
+                                  name="diferencialModelo"
+                                  value={modelo}
+                                  checked={formData.diferencialModelo === modelo}
+                                  onChange={() => handleInputChange('diferencialModelo', modelo)}
+                                  className="w-5 h-5 text-[#008606] border-gray-300 focus:ring-[#008606]"
+                                />
+                                <span className="ml-3 text-sm sm:text-base text-gray-700">{modelo}</span>
+                              </label>
+                            ))}
+                          </div>
+                          {errors.diferencialModelo && (
+                            <p className="text-red-600 text-sm mt-1">{errors.diferencialModelo}</p>
+                          )}
+                        </motion.div>
+                      )}
+
+                      {/* Selector condicional para Sobretensiones monofásico */}
+                      {formData.material === 'Sobretensiones monofásico' && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-4"
+                        >
+                          <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Modelo de Sobretensiones *
+                          </label>
+                          <div className="space-y-3">
+                            {sobretensionesMonofasicoModelos.map((modelo) => (
+                              <label
+                                key={modelo}
+                                className={cn(
+                                  "flex items-center p-4 sm:p-5 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md active:scale-95 touch-manipulation",
+                                  formData.sobretensionesModelo === modelo
+                                    ? "border-[#008606] bg-[#008606]/10"
+                                    : "border-gray-300 hover:border-gray-400"
+                                )}
+                              >
+                                <input
+                                  type="radio"
+                                  name="sobretensionesModelo"
+                                  value={modelo}
+                                  checked={formData.sobretensionesModelo === modelo}
+                                  onChange={() => handleInputChange('sobretensionesModelo', modelo)}
+                                  className="w-5 h-5 text-[#008606] border-gray-300 focus:ring-[#008606]"
+                                />
+                                <span className="ml-3 text-sm sm:text-base text-gray-700">{modelo}</span>
+                              </label>
+                            ))}
+                          </div>
+                          {errors.sobretensionesModelo && (
+                            <p className="text-red-600 text-sm mt-1">{errors.sobretensionesModelo}</p>
+                          )}
+                        </motion.div>
+                      )}
+
+                      {/* Selector condicional para Sobretensiones trifásico */}
+                      {formData.material === 'Sobretensiones trifásico' && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-4"
+                        >
+                          <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Modelo de Sobretensiones *
+                          </label>
+                          <div className="space-y-3">
+                            {sobretensionesTrifasicoModelos.map((modelo) => (
+                              <label
+                                key={modelo}
+                                className={cn(
+                                  "flex items-center p-4 sm:p-5 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md active:scale-95 touch-manipulation",
+                                  formData.sobretensionesModelo === modelo
+                                    ? "border-[#008606] bg-[#008606]/10"
+                                    : "border-gray-300 hover:border-gray-400"
+                                )}
+                              >
+                                <input
+                                  type="radio"
+                                  name="sobretensionesModelo"
+                                  value={modelo}
+                                  checked={formData.sobretensionesModelo === modelo}
+                                  onChange={() => handleInputChange('sobretensionesModelo', modelo)}
+                                  className="w-5 h-5 text-[#008606] border-gray-300 focus:ring-[#008606]"
+                                />
+                                <span className="ml-3 text-sm sm:text-base text-gray-700">{modelo}</span>
+                              </label>
+                            ))}
+                          </div>
+                          {errors.sobretensionesModelo && (
+                            <p className="text-red-600 text-sm mt-1">{errors.sobretensionesModelo}</p>
+                          )}
+                        </motion.div>
+                      )}
+
+                      {/* Selector condicional para GDP */}
+                      {formData.material === 'Gestor de potencia' && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mt-4"
+                        >
+                          <label className="block text-sm font-medium text-gray-700 mb-3">
+                            Modelo de GDP *
+                          </label>
+                          <div className="space-y-3">
+                            {gdpModelos.map((modelo) => (
+                              <label
+                                key={modelo}
+                                className={cn(
+                                  "flex items-center p-4 sm:p-5 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md active:scale-95 touch-manipulation",
+                                  formData.gdpModelo === modelo
+                                    ? "border-[#008606] bg-[#008606]/10"
+                                    : "border-gray-300 hover:border-gray-400"
+                                )}
+                              >
+                                <input
+                                  type="radio"
+                                  name="gdpModelo"
+                                  value={modelo}
+                                  checked={formData.gdpModelo === modelo}
+                                  onChange={() => handleInputChange('gdpModelo', modelo)}
+                                  className="w-5 h-5 text-[#008606] border-gray-300 focus:ring-[#008606]"
+                                />
+                                <span className="ml-3 text-sm sm:text-base text-gray-700">{modelo}</span>
+                              </label>
+                            ))}
+                          </div>
+                          {errors.gdpModelo && (
+                            <p className="text-red-600 text-sm mt-1">{errors.gdpModelo}</p>
+                          )}
+                        </motion.div>
+                      )}
                     </motion.div>
                   )}
 
@@ -694,6 +1108,201 @@ export function RepairForm({
                         </div>
                         {errors.material && (
                           <p className="text-red-600 text-sm mt-2">{errors.material}</p>
+                        )}
+
+                        {/* Selector condicional para Diferencial monofásico en Sustitución */}
+                        {formData.material === 'Diferencial monofásico' && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-4"
+                          >
+                            <label className="block text-sm font-medium text-gray-700 mb-3">
+                              Modelo de Diferencial *
+                            </label>
+                            <div className="space-y-3">
+                              {diferencialMonofasicoModelos.map((modelo) => (
+                                <label
+                                  key={modelo}
+                                  className={cn(
+                                    "flex items-center p-4 sm:p-5 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md active:scale-95 touch-manipulation",
+                                    formData.diferencialModelo === modelo
+                                      ? "border-[#008606] bg-[#008606]/10"
+                                      : "border-gray-300 hover:border-gray-400"
+                                  )}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="diferencialModeloSub"
+                                    value={modelo}
+                                    checked={formData.diferencialModelo === modelo}
+                                    onChange={() => handleInputChange('diferencialModelo', modelo)}
+                                    className="w-5 h-5 text-[#008606] border-gray-300 focus:ring-[#008606]"
+                                  />
+                                  <span className="ml-3 text-sm sm:text-base text-gray-700">{modelo}</span>
+                                </label>
+                              ))}
+                            </div>
+                            {errors.diferencialModelo && (
+                              <p className="text-red-600 text-sm mt-1">{errors.diferencialModelo}</p>
+                            )}
+                          </motion.div>
+                        )}
+
+                        {/* Selector condicional para Diferencial trifásico en Sustitución */}
+                        {formData.material === 'Diferencial trifásico' && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-4"
+                          >
+                            <label className="block text-sm font-medium text-gray-700 mb-3">
+                              Modelo de Diferencial *
+                            </label>
+                            <div className="space-y-3">
+                              {diferencialTrifasicoModelos.map((modelo) => (
+                                <label
+                                  key={modelo}
+                                  className={cn(
+                                    "flex items-center p-4 sm:p-5 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md active:scale-95 touch-manipulation",
+                                    formData.diferencialModelo === modelo
+                                      ? "border-[#008606] bg-[#008606]/10"
+                                      : "border-gray-300 hover:border-gray-400"
+                                  )}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="diferencialModeloSub"
+                                    value={modelo}
+                                    checked={formData.diferencialModelo === modelo}
+                                    onChange={() => handleInputChange('diferencialModelo', modelo)}
+                                    className="w-5 h-5 text-[#008606] border-gray-300 focus:ring-[#008606]"
+                                  />
+                                  <span className="ml-3 text-sm sm:text-base text-gray-700">{modelo}</span>
+                                </label>
+                              ))}
+                            </div>
+                            {errors.diferencialModelo && (
+                              <p className="text-red-600 text-sm mt-1">{errors.diferencialModelo}</p>
+                            )}
+                          </motion.div>
+                        )}
+
+                        {/* Selector condicional para Sobretensiones monofásico en Sustitución */}
+                        {formData.material === 'Sobretensiones monofásico' && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-4"
+                          >
+                            <label className="block text-sm font-medium text-gray-700 mb-3">
+                              Modelo de Sobretensiones *
+                            </label>
+                            <div className="space-y-3">
+                              {sobretensionesMonofasicoModelos.map((modelo) => (
+                                <label
+                                  key={modelo}
+                                  className={cn(
+                                    "flex items-center p-4 sm:p-5 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md active:scale-95 touch-manipulation",
+                                    formData.sobretensionesModelo === modelo
+                                      ? "border-[#008606] bg-[#008606]/10"
+                                      : "border-gray-300 hover:border-gray-400"
+                                  )}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="sobretensionesModeloSub"
+                                    value={modelo}
+                                    checked={formData.sobretensionesModelo === modelo}
+                                    onChange={() => handleInputChange('sobretensionesModelo', modelo)}
+                                    className="w-5 h-5 text-[#008606] border-gray-300 focus:ring-[#008606]"
+                                  />
+                                  <span className="ml-3 text-sm sm:text-base text-gray-700">{modelo}</span>
+                                </label>
+                              ))}
+                            </div>
+                            {errors.sobretensionesModelo && (
+                              <p className="text-red-600 text-sm mt-1">{errors.sobretensionesModelo}</p>
+                            )}
+                          </motion.div>
+                        )}
+
+                        {/* Selector condicional para Sobretensiones trifásico en Sustitución */}
+                        {formData.material === 'Sobretensiones trifásico' && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-4"
+                          >
+                            <label className="block text-sm font-medium text-gray-700 mb-3">
+                              Modelo de Sobretensiones *
+                            </label>
+                            <div className="space-y-3">
+                              {sobretensionesTrifasicoModelos.map((modelo) => (
+                                <label
+                                  key={modelo}
+                                  className={cn(
+                                    "flex items-center p-4 sm:p-5 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md active:scale-95 touch-manipulation",
+                                    formData.sobretensionesModelo === modelo
+                                      ? "border-[#008606] bg-[#008606]/10"
+                                      : "border-gray-300 hover:border-gray-400"
+                                  )}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="sobretensionesModeloSub"
+                                    value={modelo}
+                                    checked={formData.sobretensionesModelo === modelo}
+                                    onChange={() => handleInputChange('sobretensionesModelo', modelo)}
+                                    className="w-5 h-5 text-[#008606] border-gray-300 focus:ring-[#008606]"
+                                  />
+                                  <span className="ml-3 text-sm sm:text-base text-gray-700">{modelo}</span>
+                                </label>
+                              ))}
+                            </div>
+                            {errors.sobretensionesModelo && (
+                              <p className="text-red-600 text-sm mt-1">{errors.sobretensionesModelo}</p>
+                            )}
+                          </motion.div>
+                        )}
+
+                        {/* Selector condicional para GDP en Sustitución */}
+                        {formData.material === 'Gestor de potencia' && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-4"
+                          >
+                            <label className="block text-sm font-medium text-gray-700 mb-3">
+                              Modelo de GDP *
+                            </label>
+                            <div className="space-y-3">
+                              {gdpModelos.map((modelo) => (
+                                <label
+                                  key={modelo}
+                                  className={cn(
+                                    "flex items-center p-4 sm:p-5 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md active:scale-95 touch-manipulation",
+                                    formData.gdpModelo === modelo
+                                      ? "border-[#008606] bg-[#008606]/10"
+                                      : "border-gray-300 hover:border-gray-400"
+                                  )}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="gdpModeloSub"
+                                    value={modelo}
+                                    checked={formData.gdpModelo === modelo}
+                                    onChange={() => handleInputChange('gdpModelo', modelo)}
+                                    className="w-5 h-5 text-[#008606] border-gray-300 focus:ring-[#008606]"
+                                  />
+                                  <span className="ml-3 text-sm sm:text-base text-gray-700">{modelo}</span>
+                                </label>
+                              ))}
+                            </div>
+                            {errors.gdpModelo && (
+                              <p className="text-red-600 text-sm mt-1">{errors.gdpModelo}</p>
+                            )}
+                          </motion.div>
                         )}
                       </div>
                       
@@ -774,10 +1383,54 @@ export function RepairForm({
             </motion.div>
           )}
 
-          {/* Step 3: Documentación */}
-          {currentStep === 3 && (
+          {/* Step 3: Confirmación de Cargador (solo si material === 'Cargador') */}
+          {currentStep === 3 && formData.material === 'Cargador' && (
             <motion.div
-              key="step3"
+              key="step3-confirmation"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              className="space-y-6"
+            >
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6">
+                Confirmación de Sustitución
+              </h2>
+              
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                <p className="text-sm text-blue-900 mb-4">
+                  Has seleccionado <strong>Cargador</strong> como material. Por favor, confirma el siguiente procedimiento:
+                </p>
+                
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={confirmacionCargador}
+                    onChange={(e) => {
+                      setConfirmacionCargador(e.target.checked);
+                      if (errors.confirmacionCargador) {
+                        setErrors(prev => ({ ...prev, confirmacionCargador: '' }));
+                      }
+                    }}
+                    className="w-5 h-5 mt-0.5 text-[#008606] border-gray-300 rounded focus:ring-[#008606] focus:ring-2"
+                  />
+                  <span className="text-sm text-gray-700 leading-relaxed">
+                    {tecnicoInfo.isFidelizado 
+                      ? 'Confirmo que he empaquetado el cargador antiguo en la caja del nuevo y me lo he llevado a la oficina para que sea recogido.'
+                      : 'Confirmo que he empaquetado el cargador antiguo en la caja del nuevo, lo he dejado listo para que sea recogido en la vivienda del cliente y he informado al cliente que pasarán a recogerlo en 24 / 48 horas.'}
+                  </span>
+                </label>
+                
+                {errors.confirmacionCargador && (
+                  <p className="text-red-600 text-sm mt-2">{errors.confirmacionCargador}</p>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 4: Documentación */}
+          {currentStep === 4 && (
+            <motion.div
+              key="step4"
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
@@ -844,6 +1497,30 @@ export function RepairForm({
                 </motion.div>
               )}
 
+              {/* Mostrar campo de foto de etiqueta antigua si el material es "Cargador" */}
+              {formData.material === 'Cargador' && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                >
+                  <FileUpload
+                    label="Foto de la etiqueta del equipo antiguo"
+                    required
+                    error={errors.fotoEtiquetaAntigua}
+                    onFileSelect={(selected) => handleFileChange('fotoEtiquetaAntigua', selected)}
+                    accept={{
+                      'image/*': ['.png', '.jpg', '.jpeg', '.gif'],
+                    }}
+                  />
+                  {existingAttachments.fotoEtiquetaAntigua.length > 0 && files.fotoEtiquetaAntigua.length === 0 && (
+                    <p className="text-sm text-gray-500 -mt-2">
+                      Ya hay {existingAttachments.fotoEtiquetaAntigua.length === 1 ? 'una foto' : `${existingAttachments.fotoEtiquetaAntigua.length} fotos`} de la etiqueta antigua almacenada.
+                    </p>
+                  )}
+                </motion.div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Factura (solo PDF)
@@ -884,7 +1561,7 @@ export function RepairForm({
             Atrás
           </button>
 
-          {currentStep < 3 ? (
+          {currentStep < 4 ? (
             <button
               type="button"
               onClick={nextStep}

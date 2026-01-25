@@ -47,7 +47,7 @@ export function NavigationBar({ onLogout, activePage = 'inicio' }: NavigationBar
           </Link>
           
           <a
-            href="https://wa.me/34611563835"
+            href="https://wa.me/34633177456"
             target="_blank"
             rel="noopener noreferrer"
             className="flex flex-col items-center justify-center gap-1 text-gray-600 hover:text-gray-900 transition-colors"
@@ -57,7 +57,7 @@ export function NavigationBar({ onLogout, activePage = 'inicio' }: NavigationBar
           </a>
           
           <a
-            href="tel:+34611563835"
+            href="tel:+34633177456"
             className="flex flex-col items-center justify-center gap-1 text-gray-600 hover:text-gray-900 transition-colors"
           >
             <Phone className="w-5 h-5" />
@@ -98,7 +98,7 @@ export function NavigationBar({ onLogout, activePage = 'inicio' }: NavigationBar
           </Link>
           
           <a
-            href="https://wa.me/34611563835"
+            href="https://wa.me/34633177456"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-full transition-colors"
@@ -108,7 +108,7 @@ export function NavigationBar({ onLogout, activePage = 'inicio' }: NavigationBar
           </a>
           
           <a
-            href="tel:+34611563835"
+            href="tel:+34633177456"
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-full transition-colors"
           >
             <Phone className="w-4 h-4" />

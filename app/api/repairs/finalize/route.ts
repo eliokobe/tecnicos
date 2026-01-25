@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRecordById, updateServicioRecord, getServicioById, createEnvio } from '@/lib/airtable';
+import { getRecordById, updateServicioRecord } from '@/lib/airtable';
 
 // POST - Actualizar estado del servicio según el resultado de la reparación
 export async function POST(request: NextRequest) {
@@ -45,47 +45,11 @@ export async function POST(request: NextRequest) {
       Estado: nuevoEstado
     });
 
-    // 6. Si resultado es "Reparado", acción es "Sustitución" y material es "Cargador", crear registro en Envíos
-    let envioCreado = null;
-    const accion = repairRecord.fields['¿Qué acción se ha realizado?'] || repairRecord.fields['Reparación'];
-    const material = repairRecord.fields['Material'];
-    
-    if (resultado === 'Reparado' && accion === 'Sustitución' && material === 'Cargador') {
-      try {
-        // Obtener los datos completos del servicio
-        const servicioData = await getServicioById(servicioId);
-        
-        if (servicioData && servicioData.fields) {
-          const fields = servicioData.fields;
-          
-          // Crear el registro en Envíos
-          const envioResult = await createEnvio({
-            'Cliente': fields['Cliente'],
-            'Dirección': fields['Dirección'],
-            'Población': fields['Población'],
-            'Código postal': fields['Código postal'],
-            'Provincia': fields['Provincia'],
-            'Teléfono': fields['Teléfono'],
-            'Transporte': 'Inbound Logística',
-            'Estado': 'Pendiente recogida',
-            'Servicio': [servicioId]
-          });
-          
-          envioCreado = envioResult.id;
-          console.log('✅ Envío creado:', envioCreado);
-        }
-      } catch (error) {
-        console.error('Error al crear envío:', error);
-        // No lanzamos el error para no interrumpir el flujo principal
-      }
-    }
-
     return NextResponse.json({ 
       success: true, 
       servicioId,
       nuevoEstado,
-      envioCreado,
-      message: `Servicio actualizado a ${nuevoEstado}${envioCreado ? ' y envío creado' : ''}` 
+      message: `Servicio actualizado a ${nuevoEstado}` 
     });
 
   } catch (error: any) {

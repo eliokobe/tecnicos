@@ -17,6 +17,31 @@ export const cuadroElectricoOptions = [
   'Cargador'
 ];
 
+export const diferencialMonofasicoModelos = [
+  'Diferencial 2P 40A',
+  'Diferencial 2P 32A'
+];
+
+export const diferencialTrifasicoModelos = [
+  'Diferencial 4P 40A',
+  'Diferencial 4P 32A'
+];
+
+export const sobretensionesMonofasicoModelos = [
+  'Sobretensiones e iga 2P 40A',
+  'Sobretensiones e iga 2P 32A'
+];
+
+export const sobretensionesTrifasicoModelos = [
+  'Sobretensiones e iga 4P 40A',
+  'Sobretensiones e iga 4P 32A'
+];
+
+export const gdpModelos = [
+  'GDP monofásico',
+  'GDP trifásico'
+];
+
 // Opciones específicas para reparación de electrodomésticos
 export const electrodomesticosServicios = [
   'Reparar el sistema eléctrico',

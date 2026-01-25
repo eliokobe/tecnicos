@@ -95,12 +95,19 @@ export async function GET(request: NextRequest) {
       resultado: fields['Resultado'] || fields['resultado'] || fields['Estado'] || '',
       reparacion: fields['Reparación'] || fields['reparacion'] || '',
       material: fields['Material'] || fields['material'] || fields['Cuadro eléctrico'] || '',
+      diferencialModelo: fields['Diferencial Modelo'] || '',
+      sobretensionesModelo: fields['Sobretensiones Modelo'] || '',
+      gdpModelo: fields['GDP Modelo'] || '',
       detalles: fields['Detalles'] || fields['detalles'] || fields['Problema'] || '',
       numeroSerie: fields['Número de serie nuevo'] || fields['Número de serie'] || fields['numeroSerie'] || '',
       numeroSerieAntiguo: fields['Número de serie antiguo'] || fields['numeroSerieAntiguo'] || '',
       factura: fields['Factura'] || [],
       foto: fields['Foto'] || [],
       fotoEtiqueta: fields['Foto de etiqueta'] || fields['Foto de la etiqueta'] || fields['fotoEtiqueta'] || [],
+      fotoEtiquetaAntigua: fields['Foto de la etiqueta antigua'] || fields['fotoEtiquetaAntigua'] || [],
+      isFidelizado: Array.isArray(fields['Fidelizado']) 
+        ? (fields['Fidelizado'].length > 0 && fields['Fidelizado'][0] === true)
+        : (fields['Fidelizado'] === true),
       expediente: fields['Expediente'] || fields['expediente'] || '',
       fecha: fields['Fecha'] || fields['fecha'] || '',
       // Campos adicionales para CitaForm
@@ -154,7 +161,7 @@ export async function PATCH(request: NextRequest) {
     const urlExpediente = searchParams.get('expediente');
     
     // Separar attachments del resto de los datos
-    const { id, recordId, Foto, Factura, 'Foto de la etiqueta': FotoEtiqueta, ...updateData } = body;
+    const { id, recordId, Foto, Factura, 'Foto de la etiqueta': FotoEtiqueta, 'Foto de la etiqueta antigua': FotoEtiquetaAntigua, ...updateData } = body;
     const targetId = urlId || urlRecord || urlExpediente || id || recordId;
 
     if (!targetId) {
@@ -190,7 +197,12 @@ export async function PATCH(request: NextRequest) {
       } else {
         // Intentar actualizar en tabla de Reparaciones
         try {
-          result = await updateRepairRecord(finalRecordId, updateData);
+          const repairUpdateData = { ...updateData };
+          delete repairUpdateData['Diferencial Modelo'];
+          delete repairUpdateData['Sobretensiones Modelo'];
+          delete repairUpdateData['GDP Modelo'];
+
+          result = await updateRepairRecord(finalRecordId, repairUpdateData);
         } catch (repairError: any) {
           lastError = repairError;
           // Si falla, intentar en tabla de Formularios
@@ -219,6 +231,13 @@ export async function PATCH(request: NextRequest) {
         console.log(`📤 Subiendo ${FotoEtiqueta.length} foto(s) de etiqueta...`);
         for (const fotoEtiqueta of FotoEtiqueta) {
           await uploadImageToAirtable(finalRecordId, 'Foto de la etiqueta', fotoEtiqueta);
+        }
+      }
+
+      if (FotoEtiquetaAntigua && Array.isArray(FotoEtiquetaAntigua) && FotoEtiquetaAntigua.length > 0) {
+        console.log(`📤 Subiendo ${FotoEtiquetaAntigua.length} foto(s) de etiqueta antigua...`);
+        for (const fotoEtiquetaAntigua of FotoEtiquetaAntigua) {
+          await uploadImageToAirtable(finalRecordId, 'Foto de la etiqueta antigua', fotoEtiquetaAntigua);
         }
       }
 
