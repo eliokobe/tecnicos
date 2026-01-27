@@ -37,19 +37,28 @@ export async function POST(request: NextRequest) {
     // 3. Tomar el primer ID
     const servicioId = serviciosIds[0];
 
-    // 4. Determinar el estado según el resultado
+    // 4. Determinar los valores según el resultado
     const nuevoEstado = resultado === 'Reparado' ? 'Finalizado' : 'Pendiente revisión';
+    const resolucionVisita = resultado === 'Reparado' ? 'Presencial' : undefined;
 
     // 5. Actualizar ese registro en tabla Servicios
-    await updateServicioRecord(servicioId, {
+    const updateData: Record<string, any> = {
       Estado: nuevoEstado
-    });
+    };
+
+    // Solo agregar Resolución visita si es Reparado
+    if (resolucionVisita) {
+      updateData['Resolución visita'] = resolucionVisita;
+    }
+
+    await updateServicioRecord(servicioId, updateData);
 
     return NextResponse.json({ 
       success: true, 
       servicioId,
       nuevoEstado,
-      message: `Servicio actualizado a ${nuevoEstado}` 
+      resolucionVisita: resolucionVisita || 'sin cambios',
+      message: `Servicio actualizado a ${nuevoEstado}${resolucionVisita ? ' con Resolución visita: ' + resolucionVisita : ''}` 
     });
 
   } catch (error: any) {
